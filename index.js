@@ -1,16 +1,14 @@
-const fs = require('fs');
-const readline = require('readline');
-const {google} = require('googleapis');
+import fs from 'fs';
+import readline from 'readline';
+import {google} from 'googleapis';
 import express from 'express';
 import dotenv from 'dotenv';
+import multer from 'multer';
 dotenv.config();
 const app = express();
-import multer from 'multer';
 app.use(express.json());
 app.use (express.urlencoded({extended:false}));
-const port = 3009 || process.env.PORT, ip = process.env.IP;
-
-// console.log(process.env)
+const [port, ip] = [3009 || process.env.PORT, '127.0.0.1' || process.env.IP];
 
 const OAuth2Client = new google.auth.OAuth2(
   process.env.client_id,
@@ -34,6 +32,7 @@ let storage = multer.diskStorage({
       cb(null, '/uploads')
     },
     filename: function (req, file, cb) {
+      console.log(file)
       cb(null, file.fieldname + '-' + Date.now())
     }
   })
@@ -43,7 +42,7 @@ app.set('view engine', 'ejs')
 app.use(express.static(__dirname +'/public'))
 
 app.get('/', (req, res)=> {
-    res.status(200).json({message: 'Welcome to test app'});
+    res.status(200).json({message: 'Welcome to google drive uploader'});
 })
 
 app.get('/files/new', (req, res)=> {
@@ -51,6 +50,7 @@ app.get('/files/new', (req, res)=> {
 })
 
 app.post('/files', (req, res)=> {
+    const body = fs.createReadStream('uploads/ml-run-data-individual.csv')
     drive.files.create({
     requestBody: {
       name: 'ml-run-data-individual.',
@@ -58,28 +58,19 @@ app.post('/files', (req, res)=> {
     },
     media: {
       mimeType: 'text/csv',
-      body: fs.createReadStream('uploads/ml-run-data-individual.csv')
+      body: body
     }
   })
   .then(response=> {
-    console.log(response)
-    res.status(200).json({message: 'We got the file'})
+    const file = response.id
+    res.status(200).json({message: 'We got the file', file})
   })
-  .catch(err=>console.log(err.message))
-    // const file = fs.readFile('ml-run-data-individual.csv', (err, data)=> {
-    //     err? console.log(err) : console.log(data)
-    // })
-    // console.log(req.body, file);
-    // console.log(req.body.file);
-    // axios ({
-    //     method : 'POST',
-    //     url: 'https://www.googleapis.com/upload/drive/v3/files?uploadType=media',
-    //     data: file,
-    // })
-    // .then(res=> console.log(res))
-    // .catch(err=>console.log(err.message))
+  .catch(err=>{
+    console.log(err.message)
+    res.status(err.code).json({message: err.message, statusCode:err.code})
+  })
 })
 
-app.listen(port, () => {
+app.listen(port, ip, () => {
     console.log(`drive trial app running on port ${port}, and ip ${ip}`)
 })
